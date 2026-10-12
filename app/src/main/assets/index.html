@@ -83,7 +83,7 @@ textarea.inp{min-height:220px;line-height:1.6}
 .sec h2{display:flex;align-items:center;gap:8px;font-family:var(--display);font-size:1.9rem;font-weight:700;margin-bottom:8px}
 .sec h2 .cnt{font-family:var(--body);font-size:.9rem;font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums}
 .dot{width:12px;height:12px;border-radius:50%;flex:none;background:var(--muted)}
-.s-packed{background:var(--ok)}.s-ready{background:var(--sea)}.s-wash{background:#5B8DEF}.s-buy{background:var(--coral)}.s-find{background:var(--sun)}.s-make{background:#E58A2B}.s-other{background:#9B7BD8}
+.s-packed{background:var(--ok)}.s-ready{background:var(--sea)}.s-wash{background:#5B8DEF}.s-buy{background:var(--coral)}.s-find{background:var(--sun)}.s-make{background:#E58A2B}.s-last{background:#D9479A}.s-other{background:#9B7BD8}
 details.skipbox{margin-top:22px}details.skipbox summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--muted);font-weight:500}
 .savedrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line)}.savedrow span{flex:1 1 140px;min-width:0;overflow-wrap:anywhere}
 .empty{color:var(--muted);font-size:.9rem;padding:6px 2px}
@@ -161,8 +161,8 @@ details.skipbox{margin-top:22px}details.skipbox summary{cursor:pointer;min-heigh
 (function(){
 document.documentElement.lang='he';
 const LS='orezet-leeilat-v1';
-const STATUS={packed:'ארוז',ready:'מוכן לאריזה',wash:'לכבס',buy:'לקנות',find:'למצוא בבית',make:'להכין בבית',other:'אחר',skip:'לא לוקחת'};
-const ORDER=['packed','ready','wash','buy','find','make','other'];
+const STATUS={packed:'ארוז',ready:'מוכן לאריזה',last:'בבוקר / ברגע האחרון',wash:'לכבס',buy:'לקנות',find:'למצוא בבית',make:'להכין בבית',other:'אחר',skip:'לא לוקחת'};
+const ORDER=['packed','ready','last','wash','buy','find','make','other'];
 const IMP={crit:'קריטי',mid:'די חשוב',low:'לא יקרה כלום אם אשכח'};
 const IMPS={crit:'קריטי',mid:'די חשוב',low:'לא נורא'};
 const IMPRANK={crit:0,mid:1,low:2};
@@ -433,10 +433,10 @@ function reminders(){
   const ps=new Date(state.packStart);
   if(!isNaN(ps)&&Date.now()<ps.getTime()) r.push({tag:'האריזה',h:'מתחילים לארוז '+fmtDate(state.packStart),p:'בשעה '+fmtTime(state.packStart)+'. עד אז אפשר לסגור כביסות וקניות.'});
   else if(its.length&&packed===0) r.push({tag:'האריזה',h:'הגיע הזמן להתחיל לארוז',p:'מתחילים ממה שכבר מוכן, אחד אחד.',acts:[['להראות לי מה מוכן','goto','ready']]});
-  const why={ready:'מוכן ומחכה שתכניסי אותו לתיק.',wash:'צריך כביסה לפני האריזה.',buy:'צריך לקנות אותו.',find:'צריך למצוא אותו בבית.',make:'צריך להכין אותו בבית.'};
+  const why={ready:'מוכן ומחכה שתכניסי אותו לתיק.',wash:'צריך כביסה לפני האריזה.',buy:'צריך לקנות אותו.',find:'צריך למצוא אותו בבית.',make:'צריך להכין אותו בבית.',last:'נכנס לתיק רק בבוקר, ברגע האחרון.'};
   open.forEach(i=>r.push({tag:'קריטי',crit:1,h:i.name,p:i.status==='other'?(i.note||'צריך טיפול לפני האריזה.'):(why[i.status]||'עוד לא עברנו עליו בשאלון.'),
     acts:[['ארזתי','mv:packed',i.id],['פרטים','sheet',i.id]]}));
-  [['buy','נשאר לקנות'],['wash','נשאר לכבס'],['find','נשאר למצוא בבית'],['make','נשאר להכין בבית'],['other','דברים שצריך לסדר']].forEach(([st,t])=>{
+  [['last','לארוז בבוקר / ברגע האחרון'],['buy','נשאר לקנות'],['wash','נשאר לכבס'],['find','נשאר למצוא בבית'],['make','נשאר להכין בבית'],['other','דברים שצריך לסדר']].forEach(([st,t])=>{
     const l=its.filter(i=>i.status===st); if(l.length) r.push({tag:STATUS[st],h:t+': '+l.length,p:l.slice(0,6).map(i=>i.name).join(', ')+(l.length>6?' ועוד':''),acts:[['לרשימה','goto',st]]});
   });
   const nophoto=crit.filter(i=>i.status==='packed'&&!i.thumb).length;
@@ -485,7 +485,7 @@ V.quiz=()=>{
   const step=!it.imp?'imp':todoMode?'todo':'ready';
   let body;
   if(step==='imp') body='<div class="qq">כמה זה חשוב?</div>'+['crit','mid','low'].map(k=>'<button class="qopt" data-act="qimp" data-val="'+k+'"><span class="dot" style="background:var(--'+k+')"></span>'+IMP[k]+'</button>').join('');
-  else if(step==='ready') body='<div class="qq">יש לך את זה מוכן לאריזה?</div><button class="qopt" data-act="qready" data-val="ready"><span class="dot s-ready"></span>כן, מוכן</button><button class="qopt" data-act="qready" data-val="no"><span class="dot s-buy"></span>לא, עוד לא</button><button class="qopt" data-act="qready" data-val="packed"><span class="dot s-packed"></span>כבר בתיק</button>';
+  else if(step==='ready') body='<div class="qq">יש לך את זה מוכן לאריזה?</div><button class="qopt" data-act="qready" data-val="ready"><span class="dot s-ready"></span>כן, מוכן</button><button class="qopt" data-act="qready" data-val="last"><span class="dot s-last"></span>מוכן, אבל נארז רק בבוקר / ברגע האחרון</button><button class="qopt" data-act="qready" data-val="no"><span class="dot s-buy"></span>לא, עוד לא</button><button class="qopt" data-act="qready" data-val="packed"><span class="dot s-packed"></span>כבר בתיק</button>';
   else body='<div class="qq">מה צריך לעשות כדי שזה יהיה מוכן?</div>'+['wash','buy','find','make'].map(k=>'<button class="qopt" data-act="qtodo" data-val="'+k+'"><span class="dot s-'+k+'"></span>'+STATUS[k]+'</button>').join('')+
     (otherMode?'<form data-form="qother" class="stack"><input class="inp" id="f-other" placeholder="מה צריך לעשות?" autocomplete="off"><button class="btn pri">אישור</button></form>':'<button class="qopt" data-act="qothermode"><span class="dot s-other"></span>אחר…</button>');
   return '<div class="qwrap"><div class="prog"><div class="line"><span>'+(done+1)+' מתוך '+total+'</span><button class="muted" data-act="qexit">לעצור ולהמשיך אחר כך</button></div><div class="bar"><i style="width:'+(total?done/total*100:0)+'%"></i></div></div>'+
@@ -505,7 +505,8 @@ function rowHtml(i){
   const mb=(v,t,pri)=>'<button class="btn sm'+(pri?' pri':'')+'" data-act="mv" data-val="'+v+'" data-id="'+i.id+'">'+t+'</button>';
   if(st==='skip') b='<button class="btn sm" data-act="unskip" data-id="'+i.id+'">להחזיר לרשימה</button>';
   else if(st==='packed') b=((i.imp==='crit'&&!i.thumb)?'<button class="btn sm" data-act="photo" data-id="'+i.id+'">לצרף תמונה</button>':'')+'<button class="btn sm" data-act="unpack" data-id="'+i.id+'">להוציא מהתיק</button>';
-  else if(st==='ready') b=mb('buy','לקנות')+mb('packed','ארזתי',1);
+  else if(st==='last') b=mb('ready','מוכן')+mb('packed','ארזתי',1);
+  else if(st==='ready') b=mb('buy','לקנות')+mb('last','לבוקר')+mb('packed','ארזתי',1);
   else b=(st!=='wash'?mb('wash','לכבס'):'')+(st!=='buy'?mb('buy','לקנות'):'')+mb('ready','מוכן')+mb('packed','ארוז',1);
   const meta=[i.imp==='crit'?'<span class="c">קריטי</span>':esc(IMPS[i.imp]||''),(st==='other'&&i.note)?esc(i.note):'',esc(i.cat||'')].filter(Boolean).join(' · ');
   return '<div class="row imp-'+i.imp+(st==='packed'?' done':'')+'"><button class="rmain" data-act="sheet" data-id="'+i.id+'"><span class="rname">'+esc(i.name)+'</span><span class="rmeta">'+meta+'</span></button>'+
