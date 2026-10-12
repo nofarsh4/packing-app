@@ -124,6 +124,19 @@ details.skipbox{margin-top:22px}details.skipbox summary{cursor:pointer;min-heigh
 #toast button{background:var(--sun);color:var(--on-sun);font-weight:700;border-radius:10px;padding:6px 12px;min-height:36px;white-space:nowrap}
 #fx{position:fixed;inset:0;pointer-events:none;z-index:40}
 .egrp{font-weight:700;margin:14px 0 6px}
+.bagh{display:flex;align-items:baseline;gap:6px;font-weight:700;font-size:.95rem;margin:12px 2px 6px;color:var(--sea)}
+.bagh span{font-weight:500;color:var(--muted);font-size:.8rem;font-variant-numeric:tabular-nums}
+.bagh.ask{color:var(--crit)}
+.bagpick{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 12px}
+.bagpick button{min-height:36px;padding:4px 11px;border-radius:99px;border:1.5px solid var(--line);background:var(--surface);font-size:.85rem}
+.shop{padding:6px 14px}
+.shoprow{display:flex;align-items:center;gap:12px;min-height:44px;border-bottom:1px solid var(--line);cursor:pointer}
+.shoprow:last-child{border-bottom:0}
+.shoprow input{width:22px;height:22px;flex:none;accent-color:var(--sea)}
+.shoprow span{flex:1;min-width:0;overflow-wrap:anywhere}
+.shoprow b{font-size:.72rem;color:var(--crit)}
+.shoprow.d span{text-decoration:line-through;color:var(--muted)}
+.addbox{margin-bottom:10px}
 .erow{display:flex;gap:6px;margin-bottom:6px}
 .erow input{flex:1;min-width:0}
 .foot{margin-top:26px;text-align:center;color:var(--muted);font-size:.8rem}
@@ -144,6 +157,24 @@ const ORDER=['packed','ready','wash','buy','find','make','other'];
 const IMP={crit:'קריטי',mid:'די חשוב',low:'לא יקרה כלום אם אשכח'};
 const IMPS={crit:'קריטי',mid:'די חשוב',low:'לא נורא'};
 const IMPRANK={crit:0,mid:1,low:2};
+const BAGS=['תיק אישי קטן','תיק רחצה','בגדים','תרופות','אוכל','ציוד כדורשת','תיק נעליים','אחר'];
+function guessBag(i){
+  const n=i.name,c=i.cat||'';
+  if(/נעלי|סנדל|כפכפ|סניקרס/.test(n)) return 'תיק נעליים';
+  if(c.includes('תרופות')) return 'תרופות';
+  if(c.includes('אוכל')) return 'אוכל';
+  if(c.includes('רחצה')) return 'תיק רחצה';
+  if(c.includes('ספורט')||c.includes('כדורשת')) return 'ציוד כדורשת';
+  if(c.includes('בגדים')) return 'בגדים';
+  if(/ארנק|מטען|משקפי שמש|אוזניות|תעודת|מזומן|סוללה|אישור|מפתח|טלפון/.test(n)) return 'תיק אישי קטן';
+  if(/ליברו|כדורשת|מגני|מחממי|תלבושת|טייפ/.test(n)) return 'ציוד כדורשת';
+  if(/פיג׳מה|פיג'מה|חולצ|מכנס|טייץ|שמלה|תחתונ|חזי|גרבי|ג׳קט|עליונ|בגד ים|כובע/.test(n)) return 'בגדים';
+  if(/שיניים|סבון|שמפו|דאודורנט|קרם|מסרק|גילוח|לחפוף/.test(n)) return 'תיק רחצה';
+  if(/כריכ|בננ|מים|חטיפ|טעים|כוסות/.test(n)) return 'אוכל';
+  return null;
+}
+const bagOf=i=>(i.bag&&BAGS.includes(i.bag))?i.bag:guessBag(i);
+const shopDone=new Set();
 
 const BUILTIN=[
  {name:'כללי',items:['כרית','חולצת ליברו בתיק','לחפוף + ג׳לט','פיג׳מה','מחממי ידיים','תיק כדורשת','תיק אישי + ארנק','מגבוני עיניים','נייר לח שירותים','מטען','משקפי שמש']},
@@ -266,7 +297,7 @@ function planNotifs(){
 /* ---------- transfer between devices ---------- */
 function exportText(){
   return JSON.stringify({orezet:1,tripName:state.tripName,tripDate:state.tripDate,packStart:state.packStart,mornTime:state.mornTime||'07:00',sugDone:!!state.sugDone,sugNo:state.sugNo||[],
-    items:state.items.map(i=>{const o={name:i.name,cat:i.cat||'',imp:i.imp||null,status:i.status||null}; if(i.note)o.note=i.note; if(i.prev)o.prev=i.prev; if(i.noImp)o.noImp=true; return o})});
+    items:state.items.map(i=>{const o={name:i.name,cat:i.cat||'',imp:i.imp||null,status:i.status||null}; if(i.note)o.note=i.note; if(i.prev)o.prev=i.prev; if(i.noImp)o.noImp=true; if(i.bag)o.bag=i.bag; return o})});
 }
 function importText(txt){
   let d; try{ const a=txt.indexOf('{'),b=txt.lastIndexOf('}'); d=JSON.parse(txt.slice(a,b+1)); }catch(e){ return -1 }
@@ -276,7 +307,7 @@ function importText(txt){
   const st=freshState();
   ['tripName','tripDate','packStart','mornTime'].forEach(k=>{ if(typeof d[k]==='string'&&d[k]) st[k]=d[k] });
   st.sugDone=!!d.sugDone; st.sugNo=Array.isArray(d.sugNo)?d.sugNo.filter(x=>typeof x==='string'):[];
-  st.items=d.items.filter(o=>o&&typeof o.name==='string'&&o.name.trim()).map(o=>{const i={id:uidgen(),name:o.name.trim(),cat:typeof o.cat==='string'?o.cat:'',imp:okI(o.imp),status:okS(o.status)}; if(typeof o.note==='string'&&o.note)i.note=o.note; if(okS(o.prev))i.prev=o.prev; if(o.noImp)i.noImp=true; return i});
+  st.items=d.items.filter(o=>o&&typeof o.name==='string'&&o.name.trim()).map(o=>{const i={id:uidgen(),name:o.name.trim(),cat:typeof o.cat==='string'?o.cat:'',imp:okI(o.imp),status:okS(o.status)}; if(typeof o.note==='string'&&o.note)i.note=o.note; if(okS(o.prev))i.prev=o.prev; if(o.noImp)i.noImp=true; if(typeof o.bag==='string'&&BAGS.includes(o.bag))i.bag=o.bag; return i});
   st.phase='active'; state=st; hist=[]; save(); return st.items.length;
 }
 
@@ -289,7 +320,7 @@ function persistSaved(){
 function snapshot(auto){
   const n=new Date(),stamp=pad(n.getDate())+'/'+pad(n.getMonth()+1)+' '+pad(n.getHours())+':'+pad(n.getMinutes());
   const entry={id:auto?'auto':uidgen(),name:state.tripName+' · '+(auto?'אחרי השאלון · ':'')+stamp,at:Date.now(),
-    items:state.items.map(i=>{const o={name:i.name,cat:i.cat||'',imp:i.imp||null,status:i.status||null}; if(i.note)o.note=i.note; return o})};
+    items:state.items.map(i=>{const o={name:i.name,cat:i.cat||'',imp:i.imp||null,status:i.status||null}; if(i.note)o.note=i.note; if(i.bag)o.bag=i.bag; return o})};
   if(auto) saved=saved.filter(s=>s.id!=='auto');
   saved.unshift(entry); if(saved.length>12) saved.length=12;
   return persistSaved();
@@ -297,7 +328,7 @@ function snapshot(auto){
 function loadSaved(id,fresh){
   const s=saved.find(x=>x.id===id); if(!s) return false;
   state.items.filter(i=>i.thumb).forEach(i=>dropPhoto(i.id));
-  state.items=s.items.map(o=>{const i={id:uidgen(),name:o.name,cat:o.cat,imp:o.imp,status:o.status}; if(o.note)i.note=o.note; if(fresh&&i.status==='packed')i.status='ready'; return i});
+  state.items=s.items.map(o=>{const i={id:uidgen(),name:o.name,cat:o.cat,imp:o.imp,status:o.status}; if(o.note)i.note=o.note; if(o.bag)i.bag=o.bag; if(fresh&&i.status==='packed')i.status='ready'; return i});
   state.phase='active'; state.sugDone=true; state.morningDone=''; hist=[]; save(); return true;
 }
 
@@ -441,12 +472,25 @@ V.lists=()=>{
   if(today()===state.tripDate&&state.morningDone!==state.tripDate) h+='<div class="card stack" style="margin-bottom:12px"><b>בוקר טוב! בדיקה אחרונה לפני שיוצאים</b><button class="btn sun" data-act="goMorning">לעבור על הרשימה</button></div>';
   if(un.length) h+='<div class="card stack" style="margin-bottom:12px"><b>'+(un.length===1?'נשאר פריט אחד שעוד לא עברנו עליו':'נשארו '+un.length+' פריטים שעוד לא עברנו עליהם')+'</b><button class="btn pri" data-act="goQuiz">להמשיך בשאלון</button></div>';
   else if(!state.sugDone&&sugQueue().length) h+='<div class="card stack" style="margin-bottom:12px"><b>יש לי כמה הצעות לדברים שאולי חסרים</b><button class="btn pri" data-act="goSug">להראות לי</button></div>';
+  h+='<div class="card addbox"><b>להוסיף פריט</b>'+addForm('ladd')+'</div>';
   h+='<div class="chips">'+ORDER.map(st=>'<button data-act="goto" data-val="'+st+'">'+STATUS[st]+'<b>'+by(st).length+'</b></button>').join('')+'</div>';
-  ORDER.forEach(st=>{const l=by(st);h+='<section class="sec" id="sec-'+st+'"><h2><span class="dot s-'+st+'"></span>'+STATUS[st]+'<span class="cnt">'+l.length+'</span></h2>'+(l.length?l.map(rowHtml).join(''):'<div class="empty">'+(st==='packed'?'עוד לא ארזת כלום. מתחילים ממה שמוכן.':'אין כאן כלום כרגע')+'</div>')+'</section>'});
-  h+='<section class="sec"><h2>להוסיף פריט</h2>'+addForm('ladd')+'</section>';
+  ORDER.forEach(st=>{const l=by(st);
+    h+='<section class="sec" id="sec-'+st+'">'+((st==='buy'&&l.length)?'<button class="btn sun" data-act="goShop" style="width:100%;margin-bottom:10px">רשימת קניות ('+l.length+')</button>':'')+
+     '<h2><span class="dot s-'+st+'"></span>'+STATUS[st]+'<span class="cnt">'+l.length+'</span></h2>'+(l.length?(st==='ready'?readyHtml(l):l.map(rowHtml).join('')):'<div class="empty">'+(st==='packed'?'עוד לא ארזת כלום. מתחילים ממה שמוכן.':'אין כאן כלום כרגע')+'</div>')+'</section>'});
   if(skipped.length) h+='<details class="skipbox"><summary>ויתרתי עליהם הפעם ('+skipped.length+')</summary>'+skipped.map(rowHtml).join('')+'</details>';
   h+='<div class="foot">'+(AND?'נשמר על הטלפון הזה':db&&cloudOk?'נשמר בחשבון שלך וזמין מכל מכשיר':'נשמר במכשיר הזה בלבד')+'</div>';
   return h;
+};
+function readyHtml(l){
+  let h='';const un=l.filter(i=>!bagOf(i));
+  if(un.length) h+='<div class="bagh ask">לאן זה הולך? <span>'+un.length+'</span></div>'+un.map(i=>rowHtml(i)+'<div class="bagpick">'+BAGS.map((b,k)=>'<button data-act="bag" data-id="'+i.id+'" data-val="'+k+'">'+b+'</button>').join('')+'</div>').join('');
+  BAGS.forEach(b=>{const g=l.filter(i=>bagOf(i)===b); if(g.length) h+='<div class="bagh">'+b+' <span>'+g.length+'</span></div>'+g.map(rowHtml).join('')});
+  return h;
+}
+V.shop=()=>{
+  const l=active().filter(i=>i.status==='buy'||shopDone.has(i.id)).sort((a,b)=>IMPRANK[a.imp]-IMPRANK[b.imp]);
+  return '<div class="stack"><div class="top"><h1>רשימת קניות</h1><button class="btn sm" data-act="goLists">חזרה</button></div><p class="muted" style="margin:0">מה שמסמנים עובר ל"מוכן לאריזה".</p>'+
+   (l.length?'<div class="card shop">'+l.map(i=>{const d=i.status!=='buy';return '<label class="shoprow'+(d?' d':'')+'"><input type="checkbox" id="sh-'+i.id+'" data-ch="shop" data-id="'+i.id+'" '+(d?'checked':'')+'><span>'+esc(i.name)+'</span>'+(i.imp==='crit'?'<b>קריטי</b>':'')+'</label>'}).join('')+'</div>':'<div class="empty">אין כרגע מה לקנות</div>')+'</div>';
 };
 function addForm(name){
   return '<form data-form="'+name+'" class="stack"><div class="rowflex"><input class="inp" id="f-'+name+'-n" placeholder="מה להוסיף?" autocomplete="off" style="flex:2 1 150px"><input class="inp" id="f-'+name+'-c" placeholder="קטגוריה" list="catlist" autocomplete="off" style="flex:1 1 110px"></div><datalist id="catlist">'+cats().map(c=>'<option value="'+esc(c)+'">').join('')+'</datalist><button class="btn">להוסיף</button></form>';
@@ -520,6 +564,7 @@ function renderSheet(){
    '<button class="btn sm'+(i.status==='skip'?' sel':'')+'" data-act="mv" data-val="skip" data-id="'+i.id+'">לא לוקחת הפעם</button>'+
    ((i.prev&&i.prev!==i.status)?'<button class="btn sun" data-act="undo" data-id="'+i.id+'">להחזיר למקום הקודם: '+STATUS[i.prev]+'</button>':'')+
    (i.status==='other'?'<label class="field">מה צריך לעשות?<input id="s-note" data-ch="note" data-id="'+i.id+'" value="'+esc(i.note||'')+'"></label>':'')+
+   '<div class="lbl">לאיזה תיק זה הולך</div><div class="bagpick" style="margin:0">'+BAGS.map((b,k)=>'<button class="'+(bagOf(i)===b?'sel':'')+'" data-act="bag" data-id="'+i.id+'" data-val="'+k+'">'+b+'</button>').join('')+'</div>'+
    '<div class="lbl">כמה זה חשוב</div><div class="grid3">'+['crit','mid','low'].map(k=>'<button class="btn sm'+(i.imp===k?' sel':'')+'" data-act="imp" data-val="'+k+'" data-id="'+i.id+'">'+IMPS[k]+'</button>').join('')+'</div>'+
    (i.imp==='crit'?'<button class="btn" data-act="'+(i.thumb?'viewphoto':'photo')+'" data-id="'+i.id+'">'+(i.thumb?'לראות את התמונה':'לצרף תמונה שארזתי')+'</button>':'')+
    '<label class="field">שם הפריט<input id="s-name" data-ch="ename" data-id="'+i.id+'" value="'+esc(i.name)+'"></label>'+
@@ -565,6 +610,7 @@ document.addEventListener('submit',e=>{
 document.addEventListener('change',e=>{
   const t=e.target; if(t.id==='photoInput'){onPhoto(t.files[0]);t.value='';return}
   const k=t.dataset.ch; if(!k) return;
+  if(k==='shop'){const it=item(t.dataset.id); if(it){ if(t.checked){it.prev='buy';it.status='ready';shopDone.add(it.id)} else {it.status='buy';it.prev='ready';shopDone.delete(it.id)} save(); const l=t.closest('label'); if(l) l.classList.toggle('d',t.checked);} return}
   if(k==='ename'){const it=item(t.dataset.id),v=t.value.trim(); if(it&&v){it.name=v;save(); if(sheetId){$('#app').innerHTML=V[view](); if(view==='lists')renderRem(false)}}}
   else if(k==='note'){const it=item(t.dataset.id); if(it){it.note=t.value.trim();save()}}
   else if(k==='autoRotate'){state.autoRotate=t.checked;save()}
@@ -620,6 +666,8 @@ document.addEventListener('click',e=>{
     case 'rnext': rIdx++; renderRem(true); break;
     case 'goSettings': go('settings'); break;
     case 'goTransfer': go('transfer'); break;
+    case 'goShop': shopDone.clear(); go('shop'); break;
+    case 'bag': if(it&&BAGS[+val]){it.bag=BAGS[+val];save();$('#app').innerHTML=V[view](); if(view==='lists')renderRem(false); renderSheet();} break;
     case 'expCopy': {
       const txt=exportText(),ta=$('#f-exp'),show=()=>{ta.hidden=false;ta.value=txt;ta.focus();ta.select();toast('סמני את כל הטקסט והעתיקי אותו')};
       if(AND&&typeof AND.copy==='function'){try{AND.copy(txt);toast('הועתק. עכשיו מדביקים במכשיר השני');break}catch(e){}}
