@@ -137,6 +137,10 @@ details.skipbox{margin-top:22px}details.skipbox summary{cursor:pointer;min-heigh
 .shoprow b{font-size:.72rem;color:var(--crit)}
 .shoprow.d span{text-decoration:line-through;color:var(--muted)}
 .addbox{margin-bottom:10px}
+.casebox{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.casebox svg{width:46%;max-width:190px;flex:none;height:auto}
+.casetxt{min-width:0;flex:1}
+.casepct{font-size:3.4rem;color:var(--sea)}
 .askout{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface2);border-radius:12px;padding:10px 12px;margin-top:8px;font-size:.95rem}
 .askout.wait{color:var(--muted)}
 .erow{display:flex;gap:6px;margin-bottom:6px}
@@ -508,6 +512,7 @@ V.lists=()=>{
   const by=st=>its.filter(i=>i.imp&&i.status===st).sort((a,b)=>IMPRANK[a.imp]-IMPRANK[b.imp]);
   let h='<div class="top"><div><h1>'+esc(state.tripName)+'</h1><small>'+esc(fmtDate(state.tripDate))+'</small></div><button class="iconbtn" data-act="goSettings" aria-label="הגדרות">'+gear+'</button></div>';
   h+='<div id="rem"></div>';
+  h+=caseSvg(packed,total);
   h+='<div class="prog"><div class="line"><span>בתיק</span><span>'+packed+' מתוך '+total+'</span></div><div class="bar"><i style="width:'+(total?packed/total*100:0)+'%"></i></div>'+
      (crit.length?'<div class="line"><span>קריטיים בתיק</span><span>'+critP+' מתוך '+crit.length+'</span></div><div class="bar c"><i style="width:'+(critP/crit.length*100)+'%"></i></div>':'')+'</div>';
   if(today()===state.tripDate&&state.morningDone!==state.tripDate) h+='<div class="card stack" style="margin-bottom:12px"><b>בוקר טוב! בדיקה אחרונה לפני שיוצאים</b><button class="btn sun" data-act="goMorning">לעבור על הרשימה</button></div>';
@@ -534,6 +539,24 @@ V.shop=()=>{
   return '<div class="stack"><div class="top"><h1>רשימת קניות</h1><button class="btn sm" data-act="goLists">חזרה</button></div><p class="muted" style="margin:0">מה שמסמנים עובר ל"מוכן לאריזה".</p>'+
    (l.length?'<div class="card shop">'+l.map(i=>{const d=i.status!=='buy';return '<label class="shoprow'+(d?' d':'')+'"><input type="checkbox" id="sh-'+i.id+'" data-ch="shop" data-id="'+i.id+'" '+(d?'checked':'')+'><span>'+esc(i.name)+'</span>'+(i.imp==='crit'?'<b>קריטי</b>':'')+'</label>'}).join('')+'</div>':'<div class="empty">אין כרגע מה לקנות</div>')+'</div>';
 };
+function caseSvg(packed,total){
+  const pct=total?packed/total:0,N=20,shown=Math.round(pct*N);
+  const cols=['var(--coral)','var(--sun)','#5B8DEF','var(--sea)','#9B7BD8','var(--ok)'];
+  let items='';
+  for(let k=0;k<shown;k++){
+    const r=Math.floor(k/5),c=k%5,x=27+c*30+(r%2?3:0),y=121-r*19,col=cols[(k*5+r)%cols.length];
+    if(k%4===3) items+='<circle cx="'+(x+7)+'" cy="'+(y+8)+'" r="7.5" fill="'+col+'"/><circle cx="'+(x+20)+'" cy="'+(y+8)+'" r="7.5" fill="'+col+'" opacity=".75"/>';
+    else items+='<rect x="'+x+'" y="'+y+'" width="27" height="16" rx="4" fill="'+col+'"/><rect x="'+(x+4)+'" y="'+(y+4)+'" width="'+(k%3?19:11)+'" height="2.5" rx="1.2" fill="#fff" opacity=".55"/>';
+  }
+  const done=total&&packed===total;
+  return '<div class="card casebox"><svg viewBox="0 0 200 160" role="img" aria-label="מזוודה שמתמלאת: '+packed+' מתוך '+total+' בתיק">'+
+   '<path d="M78 34v-12a6 6 0 0 1 6-6h32a6 6 0 0 1 6 6v12" fill="none" stroke="var(--ink)" stroke-width="5" stroke-linecap="round"/>'+
+   '<rect x="16" y="34" width="168" height="112" rx="16" fill="var(--surface2)" stroke="var(--ink)" stroke-width="4"/>'+
+   '<clipPath id="casein"><rect x="20" y="38" width="160" height="104" rx="12"/></clipPath><g clip-path="url(#casein)">'+items+'</g>'+
+   '<rect x="40" y="148" width="14" height="8" rx="3" fill="var(--ink)"/><rect x="146" y="148" width="14" height="8" rx="3" fill="var(--ink)"/>'+
+   (done?'<circle cx="160" cy="58" r="15" fill="var(--sun)"/><path d="M152 58l6 6 10-11" fill="none" stroke="#3A2A00" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>':'')+
+   '</svg><div class="casetxt"><div class="disp casepct">'+Math.round(pct*100)+'%</div><div>'+(done?'הכול בתיק!':packed?packed+' מתוך '+total+' כבר בתיק':'המזוודה עוד ריקה. כל דבר שתארזי ייכנס לכאן.')+'</div></div></div>';
+}
 function addForm(name){
   return '<form data-form="'+name+'" class="stack"><div class="rowflex"><input class="inp" id="f-'+name+'-n" placeholder="מה להוסיף?" autocomplete="off" style="flex:2 1 150px"><input class="inp" id="f-'+name+'-c" placeholder="קטגוריה" list="catlist" autocomplete="off" style="flex:1 1 110px"></div><datalist id="catlist">'+cats().map(c=>'<option value="'+esc(c)+'">').join('')+'</datalist><button class="btn">להוסיף</button></form>';
 }
