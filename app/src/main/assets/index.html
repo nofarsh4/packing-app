@@ -159,12 +159,13 @@ const ORDER=['packed','ready','wash','buy','find','make','other'];
 const IMP={crit:'קריטי',mid:'די חשוב',low:'לא יקרה כלום אם אשכח'};
 const IMPS={crit:'קריטי',mid:'די חשוב',low:'לא נורא'};
 const IMPRANK={crit:0,mid:1,low:2};
-const BAGS=['תיק אישי קטן','תיק רחצה','בגדים','תרופות','אוכל','ציוד כדורשת','תיק נעליים','אחר'];
+const BAGS=['תיק אישי קטן','תיק רחצה','תיק עדשות','בגדים','תרופות','אוכל','ציוד כדורשת','תיק נעליים','אחר'];
 function guessBag(i){
   const n=i.name,c=i.cat||'';
   if(/נעלי|סנדל|כפכפ|סניקרס/.test(n)) return 'תיק נעליים';
   if(c.includes('תרופות')) return 'תרופות';
   if(c.includes('אוכל')) return 'אוכל';
+  if(c.includes('עדשות')||/סליין|עדשות|תמיסה|טיפות עיניים|מגבוני עיניים/.test(n)) return 'תיק עדשות';
   if(c.includes('רחצה')) return 'תיק רחצה';
   if(c.includes('ספורט')||c.includes('כדורשת')) return 'ציוד כדורשת';
   if(c.includes('בגדים')) return 'בגדים';
