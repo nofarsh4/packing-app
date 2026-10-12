@@ -127,6 +127,9 @@ details.skipbox{margin-top:22px}details.skipbox summary{cursor:pointer;min-heigh
 .bagh{display:flex;align-items:baseline;gap:6px;font-weight:700;font-size:.95rem;margin:12px 2px 6px;color:var(--sea)}
 .bagh span{font-weight:500;color:var(--muted);font-size:.8rem;font-variant-numeric:tabular-nums}
 .bagh.ask{color:var(--crit)}
+.tog{cursor:pointer;user-select:none;-webkit-user-select:none}
+.bagh.tog{min-height:40px;align-items:center;background:var(--surface2);border-radius:10px;padding:4px 10px;margin:10px 0 6px}
+.chev{margin-inline-start:auto;font-size:1rem;color:var(--muted);font-family:var(--body);font-weight:400}
 .bagpick{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 12px}
 .bagpick button{min-height:36px;padding:4px 11px;border-radius:99px;border:1.5px solid var(--line);background:var(--surface);font-size:.85rem}
 .shop{padding:6px 14px}
@@ -185,6 +188,9 @@ function fixCats(){ if(state&&state.items) state.items.forEach(i=>{ if(i.cat===O
 const OLDCAT='\u05DB\u05DC\u05DC\u05D9';
 const bagOf=i=>(i.bag&&BAGS.includes(i.bag))?i.bag:guessBag(i);
 const shopDone=new Set();
+const collapsed=new Set();
+function colSave(){const j=JSON.stringify([...collapsed]);lsSet(LS+':col',j);kvPut('col',j)}
+const chev=k=>'<span class="chev">'+(collapsed.has(k)?'◂':'▾')+'</span>';
 let sampleFn=null, askSeq=0;
 const ask={q:'',a:'',busy:false};
 const canAsk=()=>!!(AND&&typeof AND.ask==='function')||!!sampleFn;
@@ -523,7 +529,7 @@ V.lists=()=>{
   h+='<div class="chips">'+ORDER.map(st=>'<button data-act="goto" data-val="'+st+'">'+STATUS[st]+'<b>'+by(st).length+'</b></button>').join('')+'</div>';
   ORDER.forEach(st=>{const l=by(st);
     h+='<section class="sec" id="sec-'+st+'">'+((st==='buy'&&l.length)?'<button class="btn sun" data-act="goShop" style="width:100%;margin-bottom:10px">רשימת קניות ('+l.length+')</button>':'')+
-     '<h2><span class="dot s-'+st+'"></span>'+STATUS[st]+'<span class="cnt">'+l.length+'</span></h2>'+(l.length?(st==='ready'?readyHtml(l):l.map(rowHtml).join('')):'<div class="empty">'+(st==='packed'?'עוד לא ארזת כלום. מתחילים ממה שמוכן.':'אין כאן כלום כרגע')+'</div>')+'</section>'});
+     '<h2 class="tog" role="button" tabindex="0" aria-expanded="'+!collapsed.has('s:'+st)+'" data-act="tog" data-val="s:'+st+'"><span class="dot s-'+st+'"></span>'+STATUS[st]+'<span class="cnt">'+l.length+'</span>'+chev('s:'+st)+'</h2>'+(collapsed.has('s:'+st)?'':l.length?(st==='ready'?readyHtml(l):l.map(rowHtml).join('')):'<div class="empty">'+(st==='packed'?'עוד לא ארזת כלום. מתחילים ממה שמוכן.':'אין כאן כלום כרגע')+'</div>')+'</section>'});
   if(skipped.length) h+='<details class="skipbox"><summary>ויתרתי עליהם הפעם ('+skipped.length+')</summary>'+skipped.map(rowHtml).join('')+'</details>';
   h+='<div class="foot">'+(AND?'נשמר על הטלפון הזה':db&&cloudOk?'נשמר בחשבון שלך וזמין מכל מכשיר':'נשמר במכשיר הזה בלבד')+'</div>';
   return h;
@@ -531,7 +537,7 @@ V.lists=()=>{
 function readyHtml(l){
   let h='';const un=l.filter(i=>!bagOf(i));
   if(un.length) h+='<div class="bagh ask">לאן זה הולך? <span>'+un.length+'</span></div>'+un.map(i=>rowHtml(i)+'<div class="bagpick">'+BAGS.map((b,k)=>'<button data-act="bag" data-id="'+i.id+'" data-val="'+k+'">'+b+'</button>').join('')+'</div>').join('');
-  BAGS.forEach(b=>{const g=l.filter(i=>bagOf(i)===b); if(g.length) h+='<div class="bagh">'+b+' <span>'+g.length+'</span></div>'+g.map(rowHtml).join('')});
+  BAGS.forEach(b=>{const g=l.filter(i=>bagOf(i)===b); if(g.length) h+='<div class="bagh tog" role="button" tabindex="0" aria-expanded="'+!collapsed.has('b:'+b)+'" data-act="tog" data-val="b:'+b+'">'+b+' <span>'+g.length+'</span>'+chev('b:'+b)+'</div>'+(collapsed.has('b:'+b)?'':g.map(rowHtml).join(''))});
   return h;
 }
 V.shop=()=>{
@@ -730,7 +736,8 @@ document.addEventListener('click',e=>{
     case 'photo': photoTarget=id; $('#photoInput').click(); break;
     case 'viewphoto': sheetId=null; viewerId=id; renderSheet(); loadPhoto(id); break;
     case 'delphoto': if(it){delete it.thumb;dropPhoto(id);viewerId=null;save();render()} break;
-    case 'goto': {const s=$('#sec-'+val); if(s) s.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'start'}); break;}
+    case 'tog': { if(collapsed.has(val)) collapsed.delete(val); else collapsed.add(val); colSave(); const y=scrollY; $('#app').innerHTML=V[view](); if(view==='lists')renderRem(false); scrollTo(0,y); break; }
+    case 'goto': { if(collapsed.delete('s:'+val)){colSave();$('#app').innerHTML=V[view]();renderRem(false)} const s=$('#sec-'+val); if(s) s.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'start'}); break;}
     case 'rprev': rIdx--; renderRem(true); break;
     case 'rnext': rIdx++; renderRem(true); break;
     case 'goSettings': go('settings'); break;
@@ -776,6 +783,7 @@ document.addEventListener('click',e=>{
 let tx=null;
 document.addEventListener('touchstart',e=>{tx=e.target.closest('.rem')?e.touches[0].clientX:null},{passive:true});
 document.addEventListener('touchend',e=>{if(tx==null)return;const dx=e.changedTouches[0].clientX-tx;tx=null;if(Math.abs(dx)>45){rIdx+=dx>0?1:-1;rPause=Date.now()+15000;renderRem(true)}},{passive:true});
+document.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('tog')){e.preventDefault();e.target.click()} });
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&state){refreshFromCloud(); if(view==='lists') render()}});
 
 /* ---------- boot ---------- */
@@ -788,6 +796,7 @@ try{const raw=lsGet(LS); if(raw){const s=JSON.parse(raw); if(s&&s.v) state=s}}ca
 try{const raw=kvGet('state'); if(raw){const s=JSON.parse(raw); if(s&&s.v&&(!state||(s.updatedAt||0)>=(state.updatedAt||0))) state=s}}catch(e){}
 try{const rs=kvGet('saved')||lsGet(LS+':saved'); if(rs){const a=JSON.parse(rs); if(Array.isArray(a)) saved=a}}catch(e){}
 try{const rt=kvGet('template'); if(rt){const a=JSON.parse(rt); if(Array.isArray(a)) template=a}}catch(e){}
+try{const rc=kvGet('col')||lsGet(LS+':col'); if(rc){const a=JSON.parse(rc); if(Array.isArray(a)) a.forEach(x=>collapsed.add(x))}}catch(e){}
 window.orzBack=function(){
   if(sheetId||viewerId){sheetId=null;viewerId=null;armed=null;renderSheet();return true}
   if(view==='lists'||view==='welcome'||view==='loading') return false;
