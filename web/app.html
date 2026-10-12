@@ -137,6 +137,8 @@ details.skipbox{margin-top:22px}details.skipbox summary{cursor:pointer;min-heigh
 .shoprow b{font-size:.72rem;color:var(--crit)}
 .shoprow.d span{text-decoration:line-through;color:var(--muted)}
 .addbox{margin-bottom:10px}
+.askout{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface2);border-radius:12px;padding:10px 12px;margin-top:8px;font-size:.95rem}
+.askout.wait{color:var(--muted)}
 .erow{display:flex;gap:6px;margin-bottom:6px}
 .erow input{flex:1;min-width:0}
 .foot{margin-top:26px;text-align:center;color:var(--muted);font-size:.8rem}
@@ -175,6 +177,41 @@ function guessBag(i){
 }
 const bagOf=i=>(i.bag&&BAGS.includes(i.bag))?i.bag:guessBag(i);
 const shopDone=new Set();
+let sampleFn=null, askSeq=0;
+const ask={q:'',a:'',busy:false};
+const canAsk=()=>!!(AND&&typeof AND.ask==='function')||!!sampleFn;
+function askInner(){
+  if(!canAsk()) return '';
+  return '<div class="card addbox"><b>לשאול את האפליקציה</b><form data-form="ask" class="stack"><div class="rowflex"><input class="inp" id="f-ask" placeholder="למשל: לאילו תמרוקים צריך בקבוקון קטן?" autocomplete="off" value="'+esc(ask.q)+'" style="flex:3 1 170px"><button class="btn pri" id="ask-btn" '+(ask.busy?'disabled':'')+' style="flex:0 0 auto">לשאול</button></div></form>'+
+   '<div class="askout'+(ask.busy?' wait':'')+'" id="ask-out" '+((ask.a||ask.busy)?'':'hidden')+'>'+esc(ask.busy&&!ask.a?'חושבת…':ask.a)+'</div></div>';
+}
+function askShow(){const o=$('#ask-out'),b=$('#ask-btn'); if(o){o.hidden=!(ask.a||ask.busy);o.textContent=(ask.busy&&!ask.a)?'חושבת…':ask.a;o.classList.toggle('wait',ask.busy)} if(b)b.disabled=ask.busy}
+function askPrompt(q){
+  const lines=state.items.map(i=>[i.name,i.cat||'',IMPS[i.imp]||'לא סווג',STATUS[i.status]||'עוד לא נבדק',(i.status==='other'&&i.note)?i.note:'',bagOf(i)||''].join(' | ')).join('\n');
+  return 'את עוזרת אריזה בתוך אפליקציית רשימת אריזה אישית. עני בעברית, בקצרה ולעניין, בטקסט פשוט בלי כוכביות ובלי סימני עיצוב, ופני אל המשתמשת בלשון נקבה. '+
+   'התבססי על הרשימה שלמטה. כשהשאלה דורשת ידע כללי על אריזה או על הפריטים, השתמשי בו. אם פריט שהשאלה נוגעת בו לא מופיע ברשימה, אמרי זאת. אל תמציאי פריטים שלא ברשימה.\n\n'+
+   'הנסיעה: '+state.tripName+', בתאריך '+state.tripDate+'.\n\nהרשימה (שם | קטגוריה | חשיבות | מצב | הערה | תיק):\n'+lines+'\n\nהשאלה: '+q;
+}
+function askGo(q){
+  if(ask.busy||!q) return;
+  ask.q=q; ask.a=''; ask.busy=true; askShow();
+  const done=(t)=>{ask.a=t;ask.busy=false;askShow()};
+  const prompt=askPrompt(q);
+  if(AND&&typeof AND.ask==='function'){
+    const key=(kvGet('gkey')||'').trim();
+    if(!key){done('כדי לשאול שאלות באפליקציה בטלפון צריך מפתח של Gemini. מזינים אותו פעם אחת בהגדרות, בשדה "מפתח Gemini".');return}
+    const id='a'+(++askSeq);
+    window.orzAnswer=(rid,ok,text)=>{ if(rid!==id) return;
+      if(ok) done(String(text).replace(/\*\*/g,'').trim());
+      else done(/http 40[013]/.test(text)?'גוגל לא קיבלה את המפתח. כדאי לבדוק בהגדרות שהוא הודבק במלואו. ('+String(text).slice(0,120)+')':/http 429/.test(text)?'הגעת למכסת השאלות של המפתח כרגע. אפשר לנסות שוב בעוד כמה דקות.':'לא הצלחתי לקבל תשובה. כדאי לבדוק את החיבור לאינטרנט ולנסות שוב. ('+String(text).slice(0,120)+')'); };
+    try{AND.ask(id,key,prompt)}catch(e){done('לא הצלחתי לשלוח את השאלה.')}
+    return;
+  }
+  sampleFn(prompt,{cache:false,onText:u=>{ask.a=u.text;askShow()}}).then(r=>done(r.text.replace(/\*\*/g,'').trim()),e=>{
+    const c=e&&e.code;
+    done(c==='not_granted'?'כדי לענות צריך לאשר לדף להשתמש ב-Claude. אפשר לאשר בחלון שנפתח ולשאול שוב.':c==='rate_limited'?'יותר מדי שאלות כרגע. אפשר לנסות שוב בעוד כמה דקות.':c==='refused'?'על השאלה הזאת אני לא יכולה לענות. אפשר לנסח אותה אחרת.':((e&&e.text)?e.text+'\n\n':'')+'התשובה נקטעה. אפשר לנסות שוב.');
+  });
+}
 
 const BUILTIN=[
  {name:'כללי',items:['כרית','חולצת ליברו בתיק','לחפוף + ג׳לט','פיג׳מה','מחממי ידיים','תיק כדורשת','תיק אישי + ארנק','מגבוני עיניים','נייר לח שירותים','מטען','משקפי שמש']},
@@ -472,6 +509,7 @@ V.lists=()=>{
   if(today()===state.tripDate&&state.morningDone!==state.tripDate) h+='<div class="card stack" style="margin-bottom:12px"><b>בוקר טוב! בדיקה אחרונה לפני שיוצאים</b><button class="btn sun" data-act="goMorning">לעבור על הרשימה</button></div>';
   if(un.length) h+='<div class="card stack" style="margin-bottom:12px"><b>'+(un.length===1?'נשאר פריט אחד שעוד לא עברנו עליו':'נשארו '+un.length+' פריטים שעוד לא עברנו עליהם')+'</b><button class="btn pri" data-act="goQuiz">להמשיך בשאלון</button></div>';
   else if(!state.sugDone&&sugQueue().length) h+='<div class="card stack" style="margin-bottom:12px"><b>יש לי כמה הצעות לדברים שאולי חסרים</b><button class="btn pri" data-act="goSug">להראות לי</button></div>';
+  h+='<div id="askbox">'+askInner()+'</div>';
   h+='<div class="card addbox"><b>להוסיף פריט</b>'+addForm('ladd')+'</div>';
   h+='<div class="chips">'+ORDER.map(st=>'<button data-act="goto" data-val="'+st+'">'+STATUS[st]+'<b>'+by(st).length+'</b></button>').join('')+'</div>';
   ORDER.forEach(st=>{const l=by(st);
@@ -500,6 +538,7 @@ V.settings=()=>'<div class="stack"><div class="top"><h1>הגדרות</h1><button
   '<div class="card stack"><b>רשימות שמורות, כולל התשובות</b><span class="muted" style="font-size:.88rem">הרשימה הנוכחית נשמרת לבד כל הזמן. כאן אפשר לשמור עותק שלה, עם כל התשובות מהשאלון, ולחזור אליו מתי שרוצים. עותק נשמר אוטומטית גם בסוף השאלון.</span>'+
   '<button class="btn pri" data-act="saveSnap">לשמור עותק של הרשימה עכשיו</button>'+
   saved.map(s=>'<div class="savedrow"><span>'+esc(s.name)+'<br><small class="muted">'+s.items.length+' פריטים</small></span><button class="btn sm" data-act="arm" data-val="load:'+s.id+'">'+(armed==='load:'+s.id?'להחליף את הנוכחית?':'לטעון')+'</button><button class="btn sm danger" data-act="arm" data-val="dels:'+s.id+'">'+(armed==='dels:'+s.id?'בטוחה?':'מחיקה')+'</button></div>').join('')+'</div>'+
+  ((AND&&typeof AND.ask==='function')?'<div class="card stack"><b>שאלות חופשיות</b><span class="muted" style="font-size:.88rem">כדי שהאפליקציה תענה על שאלות היא צריכה מפתח של Gemini (גוגל). יוצרים אותו בחינם בכתובת aistudio.google.com/apikey ומדביקים כאן. המפתח נשמר רק על הטלפון. בכל שאלה הרשימה שלך נשלחת לגוגל כדי לקבל תשובה.</span><label class="field">מפתח Gemini<input id="f-gkey" type="password" data-ch="gkey" autocomplete="off" value="'+esc(kvGet('gkey')||'')+'"></label></div>':'')+
   '<button class="btn" data-act="goEditor">לערוך את הרשימה</button>'+
   '<button class="btn" data-act="goTransfer">העברת נתונים למכשיר אחר</button>'+
   '<button class="btn" data-act="moreSug">להציע לי שוב דברים שאולי חסרים</button>'+
@@ -603,6 +642,7 @@ function addFromForm(name){
 document.addEventListener('submit',e=>{
   const f=e.target.closest('[data-form]'); if(!f) return; e.preventDefault();
   const k=f.dataset.form;
+  if(k==='ask'){askGo($('#f-ask').value.trim());return}
   if(k==='qother'){const it=unanswered()[0],v=$('#f-other').value.trim(); if(!it) return; it.status='other'; if(v) it.note=v; hist.push(it.id); todoMode=false;otherMode=false; save(); render();}
   else if(k==='ladd'){if(addFromForm('ladd')){returnTo='lists';hist=[];go('quiz')}}
   else if(k==='eadd'){if(addFromForm('eadd')){render();toast('נוסף. נעבור עליו בשאלון')}}
@@ -611,6 +651,7 @@ document.addEventListener('change',e=>{
   const t=e.target; if(t.id==='photoInput'){onPhoto(t.files[0]);t.value='';return}
   const k=t.dataset.ch; if(!k) return;
   if(k==='shop'){const it=item(t.dataset.id); if(it){ if(t.checked){it.prev='buy';it.status='ready';shopDone.add(it.id)} else {it.status='buy';it.prev='ready';shopDone.delete(it.id)} save(); const l=t.closest('label'); if(l) l.classList.toggle('d',t.checked);} return}
+  if(k==='gkey'){kvPut('gkey',t.value.trim());toast(t.value.trim()?'המפתח נשמר על הטלפון':'המפתח נמחק');return}
   if(k==='ename'){const it=item(t.dataset.id),v=t.value.trim(); if(it&&v){it.name=v;save(); if(sheetId){$('#app').innerHTML=V[view](); if(view==='lists')renderRem(false)}}}
   else if(k==='note'){const it=item(t.dataset.id); if(it){it.note=t.value.trim();save()}}
   else if(k==='autoRotate'){state.autoRotate=t.checked;save()}
@@ -729,6 +770,7 @@ window.orzBack=function(){
 if(state) planNotifs();
 if(state&&state.phase!=='welcome'){view=pickView();render()}
 startTimer();
+if(!AND&&window.claude&&window.claude.use){try{window.claude.use('sample').then(s=>{ if(typeof s==='function'){sampleFn=s; const el=$('#askbox'); if(el&&view==='lists') el.innerHTML=askInner();}})}catch(e){}}
 initCloud().then(()=>{
   const had=view!=='loading';
   if(!state) state=freshState();

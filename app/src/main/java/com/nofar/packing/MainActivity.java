@@ -23,7 +23,7 @@ import java.io.File;
 
 public class MainActivity extends Activity {
     private static final int PICK = 7;
-    private WebView web;
+    WebView web;
     private ValueCallback<Uri[]> fileCb;
     private Uri camUri;
 
