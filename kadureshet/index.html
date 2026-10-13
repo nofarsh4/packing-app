@@ -1,0 +1,391 @@
+<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#ECE6D9">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<style>body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>לוח כדורשת</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700&display=swap">
+<style>
+/* layout: one-screen tactic board — top bar, opponents' bench strip, vertical court, our bench strip */
+:root{
+  --bg:#ECE6D9; --panel:#FBF8F1; --fg:#262A30; --muted:#6C6F73; --line:#D5CCBA;
+  --accent:#2F6DB5; --on-accent:#FFFFFF; --danger:#B23A33; --shadow:rgba(40,30,10,.28);
+  --ln:#FFFDF7; --net:#4A4136; --ring:rgba(255,255,255,.8); --scrim:rgba(20,18,14,.45);
+  --ca:#2F6DB5; --cb:#C8473F; --clib:#1E1E1E; --court:#DEC9A0;
+  --font:'Rubik',system-ui,'Segoe UI',Arial,sans-serif;
+  --tok:clamp(40px,11vmin,96px);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#1B1E23; --panel:#262A31; --fg:#ECE8DF; --muted:#A3A39E; --line:#3A3F48;
+  --accent:#6FA3E0; --on-accent:#10151C; --danger:#E0736B; --shadow:rgba(0,0,0,.5); color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#1B1E23; --panel:#262A31; --fg:#ECE8DF; --muted:#A3A39E; --line:#3A3F48;
+  --accent:#6FA3E0; --on-accent:#10151C; --danger:#E0736B; --shadow:rgba(0,0,0,.5); color-scheme:dark }
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);overflow:hidden}
+*{box-sizing:border-box}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+#app{height:100%;display:flex;flex-direction:column;gap:8px;padding-inline:16px;padding-block:8px}
+
+.bar{display:flex;align-items:center;gap:6px}
+.bar h1{flex:1;min-width:0;margin:0;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:8px 11px;font-size:14px;font-weight:500;cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--on-accent);border-color:transparent}
+.btn.danger{color:var(--danger)}
+.btn.wide{width:100%}
+
+.bench{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:42px;padding-block:4px}
+.bench .team{flex:none;font-size:13px;font-weight:700;color:var(--team)}
+.bench .none{flex:none;font-size:13px;color:var(--muted)}
+.bench .add{flex:none;height:34px;border-radius:17px;border:1.5px dashed var(--muted);background:none;padding:0 12px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
+
+.board{flex:1;min-height:0;position:relative;border-radius:14px;overflow:hidden;touch-action:none;
+  background:color-mix(in srgb,var(--court) 78%,#5D4A2A)}
+.court{position:absolute;left:9%;right:9%;top:6%;bottom:6%;background:var(--court);border:3px solid var(--ln)}
+.atk{position:absolute;left:0;right:0;height:3px;background:var(--ln);transform:translateY(-50%)}
+.net{position:absolute;left:4%;right:4%;top:50%;height:4px;background:var(--net);transform:translateY(-50%);border-radius:2px}
+.net::before,.net::after{content:"";position:absolute;top:50%;width:10px;height:10px;border-radius:50%;background:var(--net);transform:translateY(-50%)}
+.net::before{left:-5px}.net::after{right:-5px}
+.hint{position:absolute;width:var(--tok);height:var(--tok);border:2px dashed var(--ln);opacity:.55;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none}
+.wm{position:absolute;left:0;right:0;text-align:center;font-weight:700;font-size:clamp(14px,4.5vw,22px);color:var(--net);opacity:.3;pointer-events:none}
+.wm.b{top:8%}.wm.a{bottom:8%}
+.atk.a1{top:33.33%}.atk.a2{top:66.67%}
+
+/* landscape (tablets, phone on its side): court turns sideways, red on the right, blue on the left, benches become side columns */
+@media (orientation: landscape){
+  #app{display:grid;grid-template-columns:auto 1fr auto;grid-template-rows:auto 1fr;gap:8px 10px}
+  .bar{grid-column:1/-1}
+  .bench{flex-direction:column;flex-wrap:wrap;align-content:flex-start;align-items:stretch;max-height:100%;min-height:0;max-width:30vw;padding-block:0}
+  #bench-a{grid-row:2;grid-column:3}  /* RTL grid: column 3 is on the left, next to the blue half */
+  #bench-b{grid-row:2;grid-column:1}
+  .board{grid-row:2;grid-column:2}
+  .bench .tok{min-width:88px;text-align:center}
+  .bench .team,.bench .none{text-align:center}
+  .court{left:6%;right:6%;top:9%;bottom:9%}
+  .atk.a1,.atk.a2{top:0;bottom:0;right:auto;width:3px;height:auto;transform:translateX(-50%)}
+  .atk.a1{left:33.33%}.atk.a2{left:66.67%}
+  .net{top:4%;bottom:4%;left:50%;right:auto;width:4px;height:auto;transform:translateX(-50%)}
+  .net::before,.net::after{top:auto;left:50%;transform:translateX(-50%)}
+  .net::before{top:-5px}.net::after{bottom:-5px}
+  .wm{left:auto;right:auto;top:50%;transform:translateY(-50%)}
+  .wm.b{right:1.5%}.wm.a{left:1.5%}
+}
+
+.tok{display:flex;align-items:center;justify-content:center;text-align:center;font-weight:700;line-height:1.05;
+  color:var(--tc);background:var(--tb);border:2px solid var(--ring);box-shadow:0 2px 5px var(--shadow);
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab}
+.tok.lib{border:3px solid var(--team)}
+.bench .tok{flex:none;height:38px;padding:0 14px;border-radius:19px;font-size:15px;white-space:nowrap;touch-action:none}
+.board .tok,.bench .tok.drag{position:absolute;width:var(--tok);height:var(--tok);padding:2px;border-radius:50%;
+  font-size:calc(var(--tok)*.25);white-space:normal;overflow:hidden;overflow-wrap:anywhere;transform:translate(-50%,-50%);touch-action:none}
+.board .tok.long,.bench .tok.drag.long{font-size:calc(var(--tok)*.2)}
+.board .tok.drag,.bench .tok.drag{position:fixed;z-index:50;transform:translate(-50%,-50%) scale(1.15);cursor:grabbing}
+
+.ball{position:absolute;width:calc(var(--tok)*.8);height:calc(var(--tok)*.8);transform:translate(-50%,-50%);touch-action:none;cursor:grab;z-index:5;
+  border-radius:50%;box-shadow:0 2px 5px var(--shadow);user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.ball svg{display:block;width:100%;height:100%;pointer-events:none}
+.ball.drag{position:fixed;z-index:50;transform:translate(-50%,-50%) scale(1.15)}
+#ov{position:fixed;inset:0;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;z-index:100}
+#sheet{position:relative;width:100%;max-width:600px;max-height:86%;overflow-y:auto;background:var(--panel);border-radius:18px 18px 0 0;
+  padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px}
+#sheet h2{margin:0;font-size:18px;padding-inline-end:40px}
+#sheet h3{margin:6px 0 0;font-size:14px;color:var(--muted);font-weight:500}
+#sheet p{margin:0;font-size:13px;color:var(--muted)}
+#sheet .x{position:absolute;top:12px;inset-inline-end:12px;border:none;background:none;font-size:18px;padding:6px 10px;cursor:pointer}
+.row{display:flex;gap:8px;align-items:center}
+.row .grow{flex:1;min-width:0}
+.item{flex:1;min-width:0;text-align:start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+input[type=text],textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:9px 11px;font-size:16px}
+textarea{min-height:120px;resize:vertical}
+label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+label.color{flex-direction:row;align-items:center;justify-content:space-between;font-size:15px;color:var(--fg)}
+.sw{flex-wrap:wrap}
+.swatch{width:40px;height:40px;border-radius:50%;border:2px solid var(--line);cursor:pointer;padding:0}
+.swatch.on{outline:3px solid var(--fg);outline-offset:2px}
+.bar h1{cursor:pointer}
+#toast{position:fixed;left:50%;bottom:calc(70px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);
+  padding:9px 16px;border-radius:20px;font-size:14px;z-index:200;max-width:90%;text-align:center}
+</style>
+
+</head><body>
+<div id="app" dir="rtl" lang="he">
+  <div class="bar">
+    <h1 id="gname"></h1>
+    <button class="btn" id="b-tpl">תבניות</button>
+    <button class="btn" id="b-games">משחקים</button>
+    <button class="btn" id="b-set">הגדרות</button>
+  </div>
+  <div class="bench" id="bench-b"></div>
+  <div class="board" id="board">
+    <div class="court"><div class="atk a1"></div><div class="atk a2"></div></div>
+    <div class="net"></div>
+    <div class="wm b" id="wm-b"></div><div class="wm a" id="wm-a"></div>
+  </div>
+  <div class="bench" id="bench-a"></div>
+</div>
+<div id="ov" dir="rtl" lang="he" hidden><div id="sheet"></div></div>
+<div id="toast" dir="rtl" hidden></div>
+
+<script>
+(function(){
+const KEY='kadureshet-board-v1';
+const DEF_COLORS={a:'#2F6DB5',b:'#C8473F',lib:'#1E1E1E',court:'#DEC9A0'};
+const $=s=>document.querySelector(s);
+const uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const clone=o=>JSON.parse(JSON.stringify(o));
+const mk=(team,name,libero)=>({id:uid(),team,name,libero:!!libero,pos:null});
+const BASE=[];
+[25,50,75].forEach(x=>{BASE.push({team:'b',x,y:18},{team:'b',x,y:38},{team:'a',x,y:62},{team:'a',x,y:82})});
+
+function freshState(){
+  return {name:'פתח תקווה נגד עיריית ת״א',teams:{a:'פתח תקווה',b:'עיריית ת״א'},players:[
+    ...['סבטה','מאשה','לנה','שירה','קטי','דנית'].map(n=>mk('a',n)), mk('a','נופר',true),
+    ...['אורית','ליטל','קובה','אלוש'].map(n=>mk('a',n)),
+    ...['איימי','עדי ארביב','עדי מאיר','יסמין','לילך','מלי','שני'].map(n=>mk('b',n))]};
+}
+let store={cur:freshState(),games:[],templates:[],colors:{...DEF_COLORS}};
+try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.cur&&s.cur.players){store=Object.assign(store,s);store.colors=Object.assign({...DEF_COLORS},s.colors||{})}}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(store))}catch(e){}}
+const S=()=>store.cur;
+const P=id=>S().players.find(p=>p.id===id);
+
+function textOn(hex){
+  const m=/^#?([0-9a-f]{6})$/i.exec(hex||'');if(!m)return '#FFFFFF';
+  const n=parseInt(m[1],16),r=n>>16,g=n>>8&255,b=n&255;
+  return (0.299*r+0.587*g+0.114*b)>160?'#1E1E1E':'#FFFFFF';
+}
+
+const board=$('#board');
+/* stored positions are always in portrait terms (red at top); in landscape they are shown turned a quarter clockwise */
+const landMQ=window.matchMedia('(orientation: landscape)');
+const toView=p=>landMQ.matches?{x:100-p.y,y:p.x}:p;
+const fromView=v=>landMQ.matches?{x:v.y,y:100-v.x}:v;
+const place=(el,p)=>{const v=toView(p);el.style.left=v.x+'%';el.style.top=v.y+'%'};
+BASE.forEach(s=>{const h=document.createElement('div');h.className='hint';board.appendChild(h)});
+(landMQ.addEventListener?landMQ.addEventListener('change',()=>render()):landMQ.addListener(()=>render()));
+
+const BALL0={x:92,y:50};
+const BALL_SVG=(()=>{
+  const pt=(r,a)=>(50+r*Math.cos(a*Math.PI/180)).toFixed(1)+','+(50+r*Math.sin(a*Math.PI/180)).toFixed(1);
+  const cols=['#D8262E','#1F8A4C','#FFFFFF'];let s='';
+  for(let i=0;i<6;i++){const a=i*60-20;
+    s+=`<path d="M50,50 Q${pt(34,a+38)} ${pt(49,a)} A49,49 0 0 1 ${pt(49,a+60)} Q${pt(34,a+98)} 50,50Z" fill="${cols[i%3]}" stroke="#2B2B2B" stroke-width="1.2" stroke-linejoin="round"/>`}
+  return `<svg viewBox="0 0 100 100" aria-label="כדור"><circle cx="50" cy="50" r="49" fill="#FFFFFF"/>${s}<circle cx="50" cy="50" r="49" fill="none" stroke="#2B2B2B" stroke-width="2"/></svg>`;
+})();
+function tokEl(p){
+  const e=document.createElement('div'),c=store.colors;
+  e.className='tok'+(p.libero?' lib':'')+(p.name.replace(/\s/g,'').length>7?' long':'');
+  e.textContent=p.name;
+  const bg=p.libero?c.lib:c[p.team];
+  e.style.setProperty('--tb',bg);e.style.setProperty('--tc',textOn(bg));e.style.setProperty('--team',c[p.team]);
+  if(p.pos)place(e,p.pos);
+  bind(e,p);return e;
+}
+function bind(e,p){
+  let sx=0,sy=0,pressed=false,drag=false,timer=null;
+  e.addEventListener('contextmenu',ev=>ev.preventDefault());
+  e.addEventListener('pointerdown',ev=>{
+    if(ev.button>0)return;
+    pressed=true;drag=false;sx=ev.clientX;sy=ev.clientY;
+    try{e.setPointerCapture(ev.pointerId)}catch(_){}
+    timer=setTimeout(()=>{if(pressed&&!drag){pressed=false;try{navigator.vibrate&&navigator.vibrate(15)}catch(_){ }playerSheet(p.id)}},480);
+  });
+  e.addEventListener('pointermove',ev=>{
+    if(!pressed)return;
+    if(!drag){if(Math.hypot(ev.clientX-sx,ev.clientY-sy)<7)return;drag=true;clearTimeout(timer);e.classList.add('drag')}
+    e.style.left=ev.clientX+'px';e.style.top=ev.clientY+'px';
+  });
+  e.addEventListener('pointerup',ev=>{
+    clearTimeout(timer);if(!pressed)return;pressed=false;if(!drag)return;drag=false;
+    const r=board.getBoundingClientRect(),x=ev.clientX,y=ev.clientY;
+    if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom){
+      const cl=(v)=>Math.max(4,Math.min(96,v));
+      p.pos=fromView({x:cl((x-r.left)/r.width*100),y:cl((y-r.top)/r.height*100)});
+    }else p.pos=null;
+    save();render();
+  });
+  e.addEventListener('pointercancel',()=>{clearTimeout(timer);const was=drag;pressed=false;drag=false;if(was)render()});
+}
+
+function render(){
+  const c=store.colors,app=$('#app'),st=S();
+  app.style.setProperty('--ca',c.a);app.style.setProperty('--cb',c.b);app.style.setProperty('--clib',c.lib);app.style.setProperty('--court',c.court);
+  $('#gname').textContent=st.name;
+  $('#wm-a').textContent=st.teams.a;$('#wm-b').textContent=st.teams.b;
+  board.querySelectorAll('.tok,.ball').forEach(t=>t.remove());
+  const bp={id:'__ball',get pos(){return st.ball||BALL0},set pos(v){st.ball=v||BALL0}};
+  const bl=document.createElement('div');bl.className='ball';bl.innerHTML=BALL_SVG;
+  place(bl,bp.pos);bind(bl,bp);board.appendChild(bl);
+  board.querySelectorAll('.hint').forEach((h,i)=>place(h,BASE[i]));
+  ['a','b'].forEach(t=>{
+    const b=$('#bench-'+t);b.innerHTML='';b.style.setProperty('--team',c[t]);
+    const lab=document.createElement('span');lab.className='team';lab.textContent=st.teams[t];b.appendChild(lab);
+    const mine=st.players.filter(p=>p.team===t),off=mine.filter(p=>!p.pos);
+    off.forEach(p=>b.appendChild(tokEl(p)));
+    if(mine.length&&!off.length){const n=document.createElement('span');n.className='none';n.textContent='כולן על המגרש';b.appendChild(n)}
+    const add=document.createElement('button');add.className='add';add.textContent='+ שחקנית';add.onclick=()=>addSheet(t);b.appendChild(add);
+    mine.filter(p=>p.pos).forEach(p=>board.appendChild(tokEl(p)));
+  });
+}
+
+/* ---------- sheets ---------- */
+const ov=$('#ov'),sh=$('#sheet');let openedAt=0,toastT=null;
+function openSheet(html){sh.innerHTML='<button class="x" data-act="close" aria-label="סגירה">✕</button>'+html;ov.hidden=false;openedAt=Date.now();sh.scrollTop=0}
+function closeSheet(){ov.hidden=true}
+function toast(t){const e=$('#toast');e.textContent=t;e.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>e.hidden=true,2200)}
+function sure(b){if(b.dataset.sure)return true;b.dataset.sure='1';b.textContent='למחוק?';return false}
+ov.addEventListener('click',ev=>{if(ev.target===ov&&Date.now()-openedAt>400)closeSheet()});
+
+function playerSheet(id){
+  const p=P(id);if(!p)return;
+  openSheet(`<h2>${esc(p.name)}</h2>
+  <label>שם<input type="text" id="p-name" data-id="${id}" value="${esc(p.name)}"></label>
+  <button class="btn wide primary" data-act="pLib" data-id="${id}">${p.libero?'להפוך לשחקנית רגילה':'להפוך לליברו'}</button>
+  ${p.pos?`<button class="btn wide" data-act="pBench" data-id="${id}">להחזיר לספסל</button>`:''}
+  <button class="btn wide danger" data-act="pDel" data-id="${id}">מחיקה מהמאגר</button>`);
+}
+function addSheet(t){
+  openSheet(`<h2>שחקנית חדשה ב${esc(S().teams[t])}</h2>
+  <label>שם<input type="text" id="new-name" autocomplete="off"></label>
+  <button class="btn wide primary" data-act="addDo" data-team="${t}">הוספה למאגר</button>`);
+  setTimeout(()=>{const i=$('#new-name');i&&i.focus()},50);
+}
+function tplSheet(){
+  openSheet(`<h2>תבניות עמידה</h2>
+  <p>בחירה בתבנית מזיזה את השחקניות שכבר על המגרש למקומות ששמרת.</p>
+  <div class="row"><button class="btn item" data-act="tplApply" data-id="base">3 קדימה, 3 אחורה</button></div>
+  ${store.templates.map(t=>`<div class="row"><button class="btn item" data-act="tplApply" data-id="${t.id}">${esc(t.name)}</button><button class="btn danger" data-act="tplDel" data-id="${t.id}">מחיקה</button></div>`).join('')}
+  <h3>שמירת העמידה שעל המגרש עכשיו</h3>
+  <div class="row"><input class="grow" type="text" id="tpl-name" placeholder="למשל: הגנת שש אחורה"><button class="btn primary" data-act="tplSave">שמירה</button></div>
+  <button class="btn wide" data-act="clearCourt">להחזיר את כולן לספסל</button>`);
+}
+function gamesSheet(){
+  openSheet(`<h2>משחקים</h2>
+  <button class="btn wide primary" data-act="editForm">עריכת המשחק הנוכחי: שמות הקבוצות והשחקניות</button>
+  <h3>משחקים שמורים</h3>
+  ${store.games.length?store.games.map(g=>`<div class="row"><button class="btn item" data-act="gameLoad" data-id="${g.id}">${esc(g.name)}</button><button class="btn" data-act="gameEdit" data-id="${g.id}">עריכה</button><button class="btn danger" data-act="gameDel" data-id="${g.id}">מחיקה</button></div>`).join(''):'<p>עוד לא נשמרו משחקים.</p>'}
+  <h3>שמירת המשחק הנוכחי (שמות ומיקומים)</h3>
+  <div class="row"><input class="grow" type="text" id="game-name" value="${esc(S().name)}"><button class="btn primary" data-act="gameSave">שמירה</button></div>
+  <button class="btn wide" data-act="newForm">משחק חדש</button>`);
+}
+function newSheet(){gameForm(false)}
+function gameForm(edit){
+  const st=S(),names=t=>st.players.filter(p=>p.team===t).map(p=>p.name).join('\n');
+  openSheet(`<h2>${edit?'עריכת המשחק':'משחק חדש'}</h2>
+  <label>שם המשחק<input type="text" id="ng-name" value="${edit?esc(st.name):''}" placeholder="למשל: פתח תקווה נגד רעננה"></label>
+  <label>הקבוצה הכחולה<input type="text" id="ng-ta" value="${esc(st.teams.a)}"></label>
+  <label>שחקניות הקבוצה הכחולה, שם בכל שורה<textarea id="ng-pa">${esc(names('a'))}</textarea></label>
+  <label>הקבוצה האדומה (היריבה)<input type="text" id="ng-tb" value="${edit?esc(st.teams.b):''}" placeholder="שם היריבה"></label>
+  <label>שחקניות הקבוצה האדומה, שם בכל שורה<textarea id="ng-pb" placeholder="אפשר להשאיר ריק ולהוסיף אחר כך">${edit?esc(names('b')):''}</textarea></label>
+  <button class="btn wide primary" data-act="${edit?'editDo':'newDo'}">${edit?'שמירת השינויים':'פתיחת המשחק'}</button>`);
+}
+function setSheet(){
+  const c=store.colors;
+  const PAL={a:['#2F6DB5','#1F4E8C','#3A8FB7','#2E8B74','#5B5BB0','#7A4BA0'],b:['#C8473F','#A8322B','#D9732E','#C2477A','#8E3B5E','#B5892E'],
+    lib:['#1E1E1E','#4A4A4A','#6B4A2B','#E0B020','#FFFFFF','#2E8B74'],court:['#DEC9A0','#D2B98A','#E6D7B8','#C9B58F','#D9C7A8','#BFD0B4']};
+  const row=(k,l)=>`<h3>${l}</h3><div class="row sw">${PAL[k].map(h=>`<button class="swatch${h.toLowerCase()===String(c[k]).toLowerCase()?' on':''}" style="background:${h}" data-act="col" data-c="${k}" data-h="${h}" aria-label="${h}"></button>`).join('')}</div>`;
+  openSheet(`<h2>הגדרות צבעים</h2>
+  ${row('a','פתח תקווה')}${row('b','היריבה')}${row('lib','ליברו')}${row('court','המגרש')}
+  <button class="btn wide" data-act="colReset">חזרה לצבעים המקוריים</button>
+  <p>הכול נשמר במכשיר הזה בלבד.</p>`);
+}
+
+function applyTemplate(spots){
+  const st=S();let moved=0;
+  ['a','b'].forEach(t=>{
+    let on=st.players.filter(p=>p.team===t&&p.pos),sp=spots.filter(s=>s.team===t),rest=[];
+    sp.forEach(s=>{const i=on.findIndex(p=>p.id===s.pid);if(i>=0){on[i].pos={x:s.x,y:s.y};on.splice(i,1);moved++}else rest.push(s)});
+    rest.forEach(s=>{if(!on.length)return;let bi=0,bd=1e9;on.forEach((p,i)=>{const d=Math.hypot(p.pos.x-s.x,p.pos.y-s.y);if(d<bd){bd=d;bi=i}});on[bi].pos={x:s.x,y:s.y};on.splice(bi,1);moved++});
+  });
+  return moved;
+}
+
+const acts={
+  close:closeSheet,
+  pLib(b){const p=P(b.dataset.id);p.libero=!p.libero;save();render();closeSheet()},
+  pBench(b){P(b.dataset.id).pos=null;save();render();closeSheet()},
+  pDel(b){if(!sure(b))return;S().players=S().players.filter(p=>p.id!==b.dataset.id);save();render();closeSheet()},
+  addDo(b){const n=$('#new-name').value.trim();if(!n){toast('צריך לכתוב שם');return}S().players.push(mk(b.dataset.team,n));save();render();closeSheet()},
+  tplApply(b){
+    const spots=b.dataset.id==='base'?BASE:(store.templates.find(t=>t.id===b.dataset.id)||{}).spots||[];
+    if(!applyTemplate(spots)){toast('קודם גוררים שחקניות למגרש');return}
+    save();render();closeSheet();
+  },
+  tplDel(b){if(!sure(b))return;store.templates=store.templates.filter(t=>t.id!==b.dataset.id);save();tplSheet()},
+  tplSave(){
+    const n=$('#tpl-name').value.trim(),on=S().players.filter(p=>p.pos);
+    if(!n){toast('צריך לתת שם לתבנית');return}
+    if(!on.length){toast('אין שחקניות על המגרש');return}
+    store.templates=store.templates.filter(t=>t.name!==n);
+    store.templates.push({id:uid(),name:n,spots:on.map(p=>({team:p.team,pid:p.id,x:p.pos.x,y:p.pos.y}))});
+    save();toast('התבנית נשמרה');tplSheet();
+  },
+  clearCourt(){S().players.forEach(p=>p.pos=null);save();render();closeSheet()},
+  gameLoad(b){const g=store.games.find(g=>g.id===b.dataset.id);if(!g)return;store.cur=clone(g.state);store.cur.gid=g.id;save();render();closeSheet();toast('נפתח: '+g.name)},
+  gameDel(b){if(!sure(b))return;store.games=store.games.filter(g=>g.id!==b.dataset.id);save();gamesSheet()},
+  gameSave(){
+    const n=$('#game-name').value.trim();if(!n){toast('צריך לתת שם למשחק');return}
+    S().name=n;store.games=store.games.filter(g=>g.name!==n);
+    const gid=uid();S().gid=gid;
+    store.games.push({id:gid,name:n,state:clone(S())});save();render();toast('המשחק נשמר');gamesSheet();
+  },
+  newForm:newSheet,
+  newDo(){
+    const old=S(),lines=id=>$(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
+    const ta=$('#ng-ta').value.trim()||'פתח תקווה',tb=$('#ng-tb').value.trim()||'היריבה';
+    const wasLib=n=>old.players.some(p=>p.team==='a'&&p.name===n&&p.libero);
+    store.cur={name:$('#ng-name').value.trim()||(ta+' נגד '+tb),teams:{a:ta,b:tb},
+      players:[...lines('#ng-pa').map(n=>mk('a',n,wasLib(n))),...lines('#ng-pb').map(n=>mk('b',n))]};
+    save();render();closeSheet();
+  },
+  col(b){store.colors[b.dataset.c]=b.dataset.h;save();render();setSheet()},
+  editForm(){gameForm(true)},
+  gameEdit(b){const g=store.games.find(g=>g.id===b.dataset.id);if(!g)return;store.cur=clone(g.state);store.cur.gid=g.id;save();render();gameForm(true)},
+  editDo(){
+    const st=S(),lines=id=>$(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
+    const merge=(t,names)=>{
+      const old=st.players.filter(p=>p.team===t);
+      if(names.length===old.length)return old.map((p,i)=>(p.name=names[i],p));
+      return names.map(n=>{const i=old.findIndex(p=>p.name===n);return i>=0?old.splice(i,1)[0]:mk(t,n)});
+    };
+    const pa=merge('a',lines('#ng-pa')),pb=merge('b',lines('#ng-pb'));
+    st.teams.a=$('#ng-ta').value.trim()||st.teams.a;st.teams.b=$('#ng-tb').value.trim()||st.teams.b;
+    st.name=$('#ng-name').value.trim()||(st.teams.a+' נגד '+st.teams.b);
+    st.players=[...pa,...pb];
+    const g=store.games.find(g=>g.id===st.gid);if(g){g.name=st.name;g.state=clone(st)}
+    save();render();closeSheet();toast(g?'השינויים נשמרו גם במשחק השמור':'השינויים נשמרו');
+  },
+  colReset(){store.colors={...DEF_COLORS};save();render();setSheet()}
+};
+sh.addEventListener('click',ev=>{const b=ev.target.closest('[data-act]');if(b&&acts[b.dataset.act])acts[b.dataset.act](b)});
+sh.addEventListener('input',ev=>{
+  const t=ev.target;
+  if(t.id==='p-name'){const p=P(t.dataset.id),v=t.value.trim();if(p&&v){p.name=v;save();render()}}
+  else if(t.dataset.c){store.colors[t.dataset.c]=t.value;save();render()}
+});
+sh.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.id==='new-name'){const b=sh.querySelector('[data-act="addDo"]');b&&b.click()}});
+
+$('#gname').onclick=()=>gameForm(true);
+$('#b-tpl').onclick=tplSheet;$('#b-games').onclick=gamesSheet;$('#b-set').onclick=setSheet;
+render();
+})();
+</script>
+
+<script>
+/* offline + auto update: the service worker caches the app; when a new version is deployed it takes over and the page reloads itself */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').then(r=>{
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)r.update()});
+  }).catch(()=>{});
+  let had=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload();had=true});
+}
+</script>
+</body></html>
